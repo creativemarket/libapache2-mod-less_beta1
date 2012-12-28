@@ -263,6 +263,16 @@ static int less_handler(request_rec* r) {
 	free(tmpfile);
 	free(lessfile);
 
+	// re-stat the css-file to get the new size
+	status = apr_stat(&cssinfo, cssfile, APR_FINFO_SIZE, r->pool);
+	if(status != APR_SUCCESS) {
+		ap_log_rerror(APLOG_MARK, APLOG_CRIT, status, r, "apr_stat failed while stat'ing %s", cssfile);
+
+		free(cssfile);
+
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
 	// send the css-file
 	if(!send_css_file(cssfile, cssinfo.size, r)) {
 		free(cssfile);
