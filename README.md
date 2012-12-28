@@ -5,19 +5,34 @@ be transparent from any script using css no matter what it's language is
 
 this apache2 module is written using c.
 
-# How it works :
+# How it works, Default configuration :
 
-when a request is sent to any css file this request will be handeled by this module, the module will compile the css file and create another file from this css file with .less extension, then the module will pass the compiled version as a resposne to the request 
+when a request is sent to any css file this request will be handeled by this module. The module will look for a less file of the same name and compare the timestamps of those files. If the less file has been changed since the last request, the modules calls lessc and compiles a new version of the the css file. If the css file is recent, no recompile will take place. In both cases, the compiled css file will be sent back to the client.
 
 example:
+1. request: http://localhost/themes/css/style.css
+2. the module will look for a http://localhost/themes/css/style.less and compare timestamps
+  1. it will then eventually recompile http://localhost/themes/css/style.css from it
+3. content of the compiled http://localhost/themes/css/style.css is delivered
 
-		 request: http://localhost/themes/css/style.css <=== this css file containes LESS codes insde it
+*Advantages:* When deploying your app from the test-system to the live-system (where you wouldn't use mod_less, would you?), the compiled css-files will be deployed, too, and all links will stay intact
+*Disadvantages:* The modules gets invoked on every css file, if it has a corresponding less-file or not. It whould not impact performance greatly, but who knows...
 
-		  the module will compile style.css and save the compiled version to :
-		 
-		 resposne: http://localhost/themes/css/style.css.less <==== this is the compiled version from style.css
-		  
-		  then the moduel will return the compiled version as response for the file "style.css"
+# How it works, Alternative configuration :
+
+this configuration needs to be enabled in less.conf
+
+when a request is sent to any css file this request will just be passed to apache and *not* be handled by this module. No automatic recompilation will be triggered when accessing css files.
+To enable automatic recompilation, instead point your application to the less file. Requests on less files are handled by this module and, as above, a recompilation will eventually be triggered. In any case, the compiled css file will be sent back to the client.
+
+example:
+1. request: http://localhost/themes/css/style.less
+2. the module will look for a http://localhost/themes/css/style.css and compare timestamps
+  1. it will then eventually recompile http://localhost/themes/css/style.css from it
+3. content of the compiled http://localhost/themes/css/style.css is delivered
+
+*Advantages:* No extra code running when accessing css files
+*Disadvantages:* You need to change your application to point to the less files for automatic recompilationd (and back after deployment)
 
 # Dependencies : 
 
