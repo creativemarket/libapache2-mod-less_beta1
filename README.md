@@ -40,10 +40,11 @@ Apache2
 
 Less Css
 
-	sudo apt-get install rubygems1.8
-	sudo gem install rubygems-update
-	sudo update_rubygems
-	sudo gem install less
+LessCSS ist a NodeJS module, so first off all you need [NodeJS](http://nodejs.org/download/). Getting this on linux probably requires [compiling it from source](https://github.com/joyent/node/wiki/Installing-Node.js-via-package-manager).
+When NodeJS is installed correctly, you can install the lessc compiler via npm, the NodeJS Package Manager:
+
+	sudo npm install -g less
+
 
 # Installation (as root):
 
