@@ -73,7 +73,8 @@ you only need to add the less.load and less.conf as mentioned in the Installatio
 
 # Developers:
 
-waleed al qadi (waleedq)  
-rewrite by MaZderMind (github@mazdermind.de).  
+- waleed al qadi (waleedq)  
+- rewrite by MaZderMind (github@mazdermind.de).  
+- bug fix / misc changes by Chris Williams ([PureForm](https://github.com/PureForm)).
 
 note: feel free to fork and contrib to this project or to drop us a mail
