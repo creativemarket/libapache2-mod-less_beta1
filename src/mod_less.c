@@ -30,6 +30,41 @@
 
 #define MAX_ERROR_SIZE 2*1024
 
+
+typedef struct {
+	int compress;
+	int always_recompile;
+	int relative_urls;
+} mod_less_cfg;
+
+// forward delcaration
+module AP_MODULE_DECLARE_DATA less_module;
+
+static const char * toggle_always_recompile(cmd_parms * parms, void *mconfig, int flag) {
+	mod_less_cfg * cfg = ap_get_module_config(parms->server->module_config, &less_module);
+	cfg->always_recompile = flag;
+	return NULL;
+}
+
+static const char * toggle_relative_urls(cmd_parms * parms, void *mconfig, int flag) {
+	mod_less_cfg * cfg = ap_get_module_config(parms->server->module_config, &less_module);
+	cfg->relative_urls = flag;
+	return NULL;
+}
+
+static const char * toggle_less_compression(cmd_parms * parms, void *mconfig, int flag) {
+	mod_less_cfg * cfg = ap_get_module_config(parms->server->module_config, &less_module);
+	cfg->compress = flag;
+	return NULL;
+}
+
+static const command_rec mod_less_commands[] = {
+	AP_INIT_FLAG("LessAlwaysRecompile", toggle_always_recompile, NULL, OR_ALL, "Always recompile less files or rely on file mtime."),
+	AP_INIT_FLAG("LessRelativeUrls", toggle_relative_urls, NULL, OR_ALL, "Compile less files with the --relative-urls flag."),
+	AP_INIT_FLAG("LessCompress", toggle_less_compression, NULL, OR_ALL, "Compile less files with the --compress flag."),
+	{ NULL }
+};
+
 int send_css_file(const char *filename, const apr_size_t size, request_rec *r) {
 	apr_status_t status;
 	apr_file_t *fd;
@@ -134,6 +169,9 @@ static int less_handler(request_rec* r) {
 	apr_finfo_t lessinfo;
 	apr_finfo_t cssinfo;
 
+	mod_less_cfg * cfg = NULL;
+	cfg = (mod_less_cfg *) ap_get_module_config(r->server->module_config, &less_module);
+
 	// try to get the stat of the less file. If it fails, there is no less file.
 	// if there is no less file corresponding to this css file,
 	// it's probably a simple standalone css file and should
@@ -148,9 +186,8 @@ static int less_handler(request_rec* r) {
 	// if there is a corresponding less file and an already-compiled css file,
 	// stat them both and see if the css file is recent enough to satisfy the request
 	if(apr_stat(&cssinfo, cssfile, APR_FINFO_MTIME | APR_FINFO_SIZE, r->pool) == APR_SUCCESS) {
-/*
 		// check, if the css-file is up-to-date
-		if(cssinfo.mtime > lessinfo.mtime) {
+		if(cfg->always_recompile != 1 && cssinfo.mtime > lessinfo.mtime) {
 
 			// send the css-file
 			if(!send_css_file(cssfile, cssinfo.size, r)) {
@@ -164,11 +201,27 @@ static int less_handler(request_rec* r) {
 			free(cssfile);
 			return OK;
 		}
-*/
+	}
+
+	const char * relative_urls_flag = "--relative-urls";
+	const char * compress_flag = "--compress";
+	const int max_len = 50;
+	char lessc_flags[max_len];
+	int offset = 0;
+	int to_write = 0;
+	if (cfg->relative_urls == 1) {
+		int to_write = max_len - offset;
+		int written = snprintf(lessc_flags + offset, to_write, "%s ", relative_urls_flag);
+		offset += written;
+	}
+	if (cfg->compress == 1) {
+		int to_write = max_len - offset;
+		int written = snprintf(lessc_flags + offset, to_write, "%s ", compress_flag);
+		offset += written;
 	}
 
 	// either there is no css file or it is too old - either way we need to recompile it
-	ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r, "Compiling CSS File %s from LESS File %s via TMP File %s", cssfile, lessfile, tmpfile);
+	ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r, "Compiling CSS File %s from LESS File %s via TMP File %s with flags %s", cssfile, lessfile, tmpfile, lessc_flags);
 
 	// create the temp file
 	apr_file_t *tmpfd;
@@ -182,17 +235,16 @@ static int less_handler(request_rec* r) {
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-
 	// TODO: place to config
 	//  placing the STDERR redirection before the STDOUT redirection gives us a
 	//  not-so-obvious result: sh connects lessc's STDERR with the popen stream
 	//  and lessc's STDOUT with the named file - we get the errors and not the css code
-	const char* lessc = "lessc --no-color %s 2>&1 >%s";
+	const char* lessc = "lessc --no-color %s %s 2>&1 >%s";
 
 	// construct the command to run
 	char* cmd;
-	if(asprintf(&cmd, lessc, lessfile, tmpfile) == -1) {
-		ap_log_rerror(APLOG_MARK, APLOG_CRIT, 0, r, "asprintf failed while constructing the lessc command out of %s, %s and %s", lessc, lessfile, cssfile);
+	if(asprintf(&cmd, lessc, lessc_flags, lessfile, tmpfile) == -1) {
+		ap_log_rerror(APLOG_MARK, APLOG_CRIT, 0, r, "asprintf failed while constructing the lessc command out of %s, %s, %s and %s", lessc, lessc_flags, lessfile, cssfile);
 
 		close_and_delete(tmpfd, tmpfile, r);
 		free(lessfile);
@@ -284,6 +336,29 @@ static int less_handler(request_rec* r) {
 	return OK;
 }
  
+static void *create_mod_less_config(apr_pool_t* pool, server_rec* srv) {
+	mod_less_cfg * cfg;
+
+	cfg = (mod_less_cfg*) apr_pcalloc(pool, sizeof(mod_less_cfg));
+
+	cfg->compress = 0;
+	cfg->always_recompile = 1;
+	cfg->relative_urls = 1;
+
+	return (void *) cfg;
+}
+
+static void *merge_server_config(apr_pool_t* pool, void* basev, void* addv) {
+	mod_less_cfg *base = (mod_less_cfg *)basev;
+	mod_less_cfg *add = (mod_less_cfg *)addv;
+	mod_less_cfg *mrg = apr_pcalloc(pool, sizeof(mod_less_cfg));
+
+	mrg->compress = add->compress;
+	mrg->always_recompile = add->always_recompile;
+	mrg->relative_urls = add->relative_urls;
+	return (void *)mrg;
+}
+
 static void register_hooks(apr_pool_t* pool)
 {
 	ap_hook_handler(less_handler, NULL, NULL, APR_HOOK_MIDDLE);
@@ -293,8 +368,8 @@ module AP_MODULE_DECLARE_DATA less_module = {
 	STANDARD20_MODULE_STUFF,
 	NULL,
 	NULL,
-	NULL,
-	NULL,
-	NULL,
+	create_mod_less_config, // per-server config
+	merge_server_config,
+	mod_less_commands,
 	register_hooks
 };

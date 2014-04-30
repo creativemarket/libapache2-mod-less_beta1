@@ -71,6 +71,21 @@ after installing apxs2 tool, cd to the src directory and execute this command
 compiled file "mod_less.so" will be automatically copied to /usr/lib/apache2/modules/mod_less.so and chmoded.
 you only need to add the less.load and less.conf as mentioned in the Installation section above.
 
+
+# Configuration
+
+The following Apache configuration directives are supported:
+
+	<IfModule mod_less.c>
+	LessAlwaysRecompile On
+	LessRelativeUrls On
+	LessCompress Off
+	</IfModule>
+
+* LessAlwaysRecompile - do not rely on file mtime & always run less compilation
+* LessRelativeUrls - pass the --relative-urls flat to the lessc compiler
+* LessCompress - pass the --compress flag to the lessc compiler
+
 # Developers:
 
 - waleed al qadi (waleedq)  
