@@ -32,9 +32,9 @@
 
 
 typedef struct {
-	int compress,
-	int always_recompile,
-	int relative_urls
+	int compress;
+	int always_recompile;
+	int relative_urls;
 } mod_less_cfg;
 
 // forward delcaration
@@ -52,7 +52,7 @@ static const char * toggle_relative_urls(cmd_parms * parms, void *mconfig, int f
 	return NULL;
 }
 
-static const char * toggle_compress(cmd_parms * parms, void *mconfig, int flag) {
+static const char * toggle_less_compression(cmd_parms * parms, void *mconfig, int flag) {
 	mod_less_cfg * cfg = ap_get_module_config(parms->server->module_config, &less_module);
 	cfg->compress = flag;
 	return NULL;
@@ -203,8 +203,25 @@ static int less_handler(request_rec* r) {
 		}
 	}
 
+	const char * relative_urls_flag = "--relative-urls";
+	const char * compress_flag = "--compress";
+	const int max_len = 50;
+	char lessc_flags[max_len];
+	int offset = 0;
+	int to_write = 0;
+	if (cfg->relative_urls == 1) {
+		int to_write = max_len - offset;
+		int written = snprintf(lessc_flags + offset, to_write, "%s ", relative_urls_flag);
+		offset += written;
+	}
+	if (cfg->compress == 1) {
+		int to_write = max_len - offset;
+		int written = snprintf(lessc_flags + offset, to_write, "%s ", compress_flag);
+		offset += written;
+	}
+
 	// either there is no css file or it is too old - either way we need to recompile it
-	ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r, "Compiling CSS File %s from LESS File %s via TMP File %s", cssfile, lessfile, tmpfile);
+	ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r, "Compiling CSS File %s from LESS File %s via TMP File %s with flags %s", cssfile, lessfile, tmpfile, lessc_flags);
 
 	// create the temp file
 	apr_file_t *tmpfd;
@@ -216,23 +233,6 @@ static int less_handler(request_rec* r) {
 		free(cssfile);
 		free(tmpfile);
 		return HTTP_INTERNAL_SERVER_ERROR;
-	}
-
-	const char * relative_urls_flag = "--relative-urls";
-	const char * compress_flag = "--compress";
-	const int max_len = 50;
-	char lessc_flags[max_len];
-	int offset = 0;
-	int to_write = 0;
-	if (cfg->relative_urls == 1) {
-		int to_write = max_len - offset;
-		int written = snprintf(less_cflags + offset, "%s ", relative_urls_flag);
-		offset += written;
-	}
-	if (cfg->compress == 1) {
-		int to_write = max_len - offset;
-		int written = snprintf(less_cflags + offset, "%s ", compress_flag);
-		offset += written;
 	}
 
 	// TODO: place to config
