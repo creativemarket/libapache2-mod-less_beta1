@@ -59,9 +59,9 @@ static const char * toggle_less_compression(cmd_parms * parms, void *mconfig, in
 }
 
 static const command_rec mod_less_commands[] = {
-	AP_INIT_FLAG("AlwaysRecompile", toggle_always_recompile, NULL, RSRC_CONF, "Always recompile less files or rely on file mtime."),
-	AP_INIT_FLAG("RelativeUrls", toggle_relative_urls, NULL, RSRC_CONF, "Compile less files with the --relative-urls flag."),
-	AP_INIT_FLAG("Compress", toggle_less_compression, NULL, RSRC_CONF, "Compile less files with the --compress flag."),
+	AP_INIT_FLAG("LessAlwaysRecompile", toggle_always_recompile, NULL, OR_ALL, "Always recompile less files or rely on file mtime."),
+	AP_INIT_FLAG("LessRelativeUrls", toggle_relative_urls, NULL, OR_ALL, "Compile less files with the --relative-urls flag."),
+	AP_INIT_FLAG("LessCompress", toggle_less_compression, NULL, OR_ALL, "Compile less files with the --compress flag."),
 	{ NULL }
 };
 
@@ -348,6 +348,16 @@ static void *create_mod_less_config(apr_pool_t* pool, server_rec* srv) {
 	return (void *) cfg;
 }
 
+static void *merge_server_config(apr_pool_t* pool, void* basev, void* addv) {
+	mod_less_cfg *base = (mod_less_cfg *)basev;
+	mod_less_cfg *add = (mod_less_cfg *)addv;
+	mod_less_cfg *mrg = apr_pcalloc(pool, sizeof(mod_less_cfg));
+
+	mrg->compress = add->compress;
+	mrg->always_recompile = add->always_recompile;
+	mrg->relative_urls = add->relative_urls;
+	return (void *)mrg;
+}
 
 static void register_hooks(apr_pool_t* pool)
 {
@@ -359,7 +369,7 @@ module AP_MODULE_DECLARE_DATA less_module = {
 	NULL,
 	NULL,
 	create_mod_less_config, // per-server config
-	NULL,
+	merge_server_config,
 	mod_less_commands,
 	register_hooks
 };

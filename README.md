@@ -76,12 +76,15 @@ you only need to add the less.load and less.conf as mentioned in the Installatio
 
 The following Apache configuration directives are supported:
 
-	<IfModule mod_less>
-		AlwaysRecompile On
-		RelativeUrls On
-		Compress Off
+	<IfModule mod_less.c>
+	LessAlwaysRecompile On
+	LessRelativeUrls On
+	LessCompress Off
 	</IfModule>
 
+* LessAlwaysRecompile - do not rely on file mtime & always run less compilation
+* LessRelativeUrls - pass the --relative-urls flat to the lessc compiler
+* LessCompress - pass the --compress flag to the lessc compiler
 
 # Developers:
 
